@@ -31,6 +31,7 @@ module tt_um_watbulb_sync_fifo #(
   wire [DATA_WIDTH - 1:0] dat_in = ui_in[DATA_WIDTH - 1:0];
 
   // locals
+  reg [DEPTH - 2:0] count;
   reg [DEPTH - 2:0] wr_ptr;
   reg [DEPTH - 2:0] rd_ptr;
   reg [DATA_WIDTH - 1:0] fifo_reg [DEPTH - 1:0];
@@ -39,30 +40,40 @@ module tt_um_watbulb_sync_fifo #(
   reg [DATA_WIDTH - 1:0] dat_out;
   reg o_full, o_empty;
 
-  // Write/Read operation
+  int i;
   always @(posedge clk) begin
     if (!rst_n) begin
-      wr_ptr <= 0;
-    end else if (wr_en && !o_full) begin
-      wr_ptr <= (wr_ptr + 1);
-      fifo_reg[wr_ptr][DATA_WIDTH - 1:0] <= dat_in;
-    end
-  end
-  always @(posedge clk) begin
-    if (!rst_n) begin
-      rd_ptr <= 0;
-    end else if (rd_en && !o_empty) begin
-      rd_ptr  <= (rd_ptr + 1);
-      dat_out <= fifo_reg[rd_ptr][DATA_WIDTH - 1:0];
+      count       <= '0;
+      wr_ptr      <= '0;
+      rd_ptr      <= '0;
+      o_full      <=  0;
+      o_empty     <=  1;
+      dat_out     <= '0;
+      for (i = 0; i < DEPTH; i = i + 1) begin : l_zero_fifo_reg
+        fifo_reg[i] <= '0;
+      end
+    end else begin
+      if (o_full)
+        wr_ptr  <= '0;
+      if (o_empty)
+        rd_ptr  <= '0;
+      if (wr_en && !o_full) begin
+        count   <= (count  + 1);
+        wr_ptr  <= (wr_ptr + 1);
+        o_empty <= 0;
+        o_full  <= (count + 1) == DEPTH;
+        fifo_reg[wr_ptr][DATA_WIDTH - 1:0] <= dat_in;
+      end else if (rd_en && !o_empty) begin
+        count   <= (count  - 1);
+        rd_ptr  <= (rd_ptr + 1);
+        o_empty <= (count  - 1) == '0;
+        o_full  <= 0;
+        dat_out[DATA_WIDTH - 1:0] <= fifo_reg[rd_ptr][DATA_WIDTH - 1:0];
+      end
     end
   end
 
-  // Are we full or empty?
-  assign o_full  = rst_n ? ((wr_ptr + 1) == rd_ptr) : 0;
-  assign o_empty = rst_n ? ((wr_ptr == rd_ptr))     : 1;
-
-  // Assign output pins
-  assign uo_out  = rst_n ? {o_empty, o_full, dat_out} : '0;
+  assign uo_out = {o_empty, o_full, dat_out};
 
 endmodule
 
