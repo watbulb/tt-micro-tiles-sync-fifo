@@ -18,6 +18,12 @@ A generic synchronous First-In-First-Out (FIFO) buffer. It operates on a single 
 
 ## Details:
 
+**FIFO Depth**:
+   - The default depth is set to 3 for practical reasons for a micro-tile, but this can be modified via the `DEPTH` parameter.
+
+**FIFO Width**:
+   - The FIFO supports a 6-bit data width, which can also be adjusted via the `DATA_WIDTH` parameter.
+
 **Reset**:
    - The `rst_n` signal resets the FIFO, clearing its contents by resetting the write and read pointers (`wr_ptr` and `rd_ptr`).
 
@@ -32,29 +38,35 @@ A generic synchronous First-In-First-Out (FIFO) buffer. It operates on a single 
 **Control Signals**:
    - `o_full`: Indicates when the FIFO has reached its maximum capacity.
    - `o_empty`: Indicates when the FIFO has no data to read.
-
-**FIFO Depth**:
-   - The default depth is set to 3 for practical reasons for a micro-tile, but this can be modified via the `DEPTH` parameter.
    
-**Data Width**:
-   - The FIFO supports a 6-bit data width, which can also be adjusted via the `DATA_WIDTH` parameter.
-
-### Performance Considerations:
-- The FIFO is implemented as a circular buffer using read and write pointers (`rd_ptr` and `wr_ptr`).
-- The maximum routable depth is 6 for a micro-tile architecture, though the current default is 3 to reduce congestion.
-- It achieves around 70% utilization, with potential room for optimization.
-
 ## How to test
 
 1. **Write Operation**:
-   - Set the `wr_en` signal (bit 6 of `ui_in`) high and ensure `o_full` is low.
-   - Apply a 6-bit data value on the lower 6 bits of `ui_in`.
-   - Observe that the data is written into the FIFO.
+   - Set the `wr_en` signal (`ui_in[6]`) high and ensure `o_full` is low (`uo_out[6]`).
+   - Apply a 6-bit data value on the lower 6 bits of `ui_in[5:0]` until `o_full` is high.
    
 2. **Read Operation**:
-   - Set the `rd_en` signal (bit 7 of `ui_in`) high and ensure `o_empty` is low.
-   - Observe that data is read from the FIFO and appears on the lower 6 bits of `uo_out`.
+   - Set the `rd_en` signal (`ui_in[7]`) high and ensure `o_empty` is low (`uo_out[7]`).
+   - Observe that data is read from the FIFO and appears on the lower 6 bits of `uo_out[5:0]`.
+   - Once all the data has been read the `o_empty` signal will go high (`uo_out[7]`).
 
-3. **Status Indicators**:
-   - Fill the FIFO and observe that the `o_full` signal is asserted when the FIFO is full.
-   - Read all data from the FIFO and observe that the `o_empty` signal is asserted when the FIFO is empty.
+### Inputs and Outputs Table
+
+| Signal  | Description            |
+|---------|------------------------|
+| `ui[0]` | FIFO Read Enable        |
+| `ui[1]` | FIFO Write Enable       |
+| `ui[2]` | FIFO Data Input 1       |
+| `ui[3]` | FIFO Data Input 2       |
+| `ui[4]` | FIFO Data Input 3       |
+| `ui[5]` | FIFO Data Input 4       |
+| `ui[6]` | FIFO Data Input 5       |
+| `ui[7]` | FIFO Data Input 6       |
+| `uo[0]` | FIFO Empty Signal       |
+| `uo[1]` | FIFO Full Signal        |
+| `uo[2]` | FIFO Data Output 1      |
+| `uo[3]` | FIFO Data Output 2      |
+| `uo[4]` | FIFO Data Output 3      |
+| `uo[5]` | FIFO Data Output 4      |
+| `uo[6]` | FIFO Data Output 5      |
+| `uo[7]` | FIFO Data Output 6      |
