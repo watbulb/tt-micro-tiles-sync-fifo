@@ -1,57 +1,82 @@
-# SPDX-FileCopyrightText: © 2024 Tiny Tapeout
+# SPDX-FileCopyrightText: © 2024 Dayton Pidhirney
 # SPDX-License-Identifier: MIT
 
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 
+MIN_DEPTH = 1
+MAX_DEPTH = 3
 
 @cocotb.test()
-async def test_loopback(dut):
+async def test_full_push_pull(dut):
     dut._log.info("Start")
-
-    # Set the clock period to 10 us (100 KHz)
-    clock = Clock(dut.clk, 10, units="us")
+    clock = Clock(dut.clk, 20, units="ns")
     cocotb.start_soon(clock.start())
 
-    # Reset
-    dut._log.info("Reset")
+    depth = MAX_DEPTH
 
-    # When under reset: ui_in -> uo_out
-    dut.ui_in.value = 0
-    dut.rst_n.value = 0
-    await ClockCycles(dut.clk, 1)
+    """
+    Try pushing and pulling every depth size between min - MAX_DEPTH
+    """
+    while depth >= MIN_DEPTH:
+        input_sequence  = list(range(0, depth))
+        output_sequence = []
+        print(f"Using input sequence: {input_sequence}")
 
-    for i in range(256):
-        dut.ui_in.value = i
-        await ClockCycles(dut.clk, 1)
-        assert dut.uo_out.value == i
+        # wait one
+        await ClockCycles(dut.clk, 1, False)
 
-@cocotb.test()
-async def test_counter(dut):
-    dut._log.info("Start")
+        print("Initialize ...")
+        # Initialize
+        dut.dat_in.value = 0b0000
+        dut.rd_en.value  = 0b0
+        dut.wr_en.value  = 0b0
+        dut.rst_n.value  = 0b0
+        await ClockCycles(dut.clk, 1, False)
 
-    # Set the clock period to 10 us (100 KHz)
-    clock = Clock(dut.clk, 10, units="us")
-    cocotb.start_soon(clock.start())
+        """
+        Write FIFO until depth is full
+        """
+        print(f"Writing FIFO to depth: {depth}")
+        dut.rst_n.value = 0b1
+        dut.rd_en.value = 0b0
+        dut.wr_en.value = 0b1
+        for i in range(0, depth):
+            dut.dat_in.value = input_sequence[i]
+            await ClockCycles(dut.clk, 1, False)
+            assert dut.o_empty.value == 0b0
+            if i != depth - 1: assert dut.o_full.value == 0b0
 
-    # rst_n == 0: put a counter on uo_out
-    dut.rst_n.value = 0
-    await ClockCycles(dut.clk, 10)
-    dut.rst_n.value = 1
-    await ClockCycles(dut.clk, 2)
+        if depth == MAX_DEPTH:
+            assert dut.o_full.value == 0b1
+        assert dut.o_empty.value == 0b0
+        print("FIFO is FULL!")
 
-    dut._log.info("Testing counter")
-    for i in range(256):
-        assert dut.uo_out.value == i
-        await ClockCycles(dut.clk, 1)
+        """
+        Read FIFO until depth is empty
+        """
+        print(f"Reading FIFO to DEPTH: {depth}")
+        dut.wr_en.value = 0b0
+        dut.rd_en.value = 0b1
+        for i in range(0, depth):
+            await ClockCycles(dut.clk, 1, False)
+            output_sequence.append(dut.dat_out.value)
+            assert dut.o_full.value == 0b0
+            if i != depth - 1: assert dut.o_empty.value == 0b0
 
-    dut._log.info("Testing reset")
-    for i in range(5):
-        assert dut.uo_out.value == i
-        await ClockCycles(dut.clk, 1)
-    dut.rst_n.value = 0
-    await ClockCycles(dut.clk, 2)
-    dut.rst_n.value = 1
-    await ClockCycles(dut.clk, 1)
-    assert dut.uo_out.value == 0
+        assert dut.o_full.value  == 0b0
+        assert dut.o_empty.value == 0b1
+        print("FIFO is EMPTY!")
+
+        print("INPUT_SEQUENCE == OUTPUT_SEQUENCE")
+        print(input_sequence)
+        print(list(map(int, output_sequence)))
+        assert input_sequence == list(map(int, output_sequence))
+
+        # Reset
+        dut.rd_en.value = 0b0
+        await ClockCycles(dut.clk, 5, False)
+        dut.rst_n.value = 0b0
+        await ClockCycles(dut.clk, 5, False)
+        depth -= 1

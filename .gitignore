@@ -2,7 +2,10 @@
 .idea
 .vscode
 *.vcd
+venv
 runs
+slpp_all
+tt
 tt_submission
 src/user_config.json
 src/config_merged.json
