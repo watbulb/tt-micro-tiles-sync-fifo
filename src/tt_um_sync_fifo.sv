@@ -12,7 +12,8 @@
  *
  * You can scale it via the DEPTH parameter below.
  *
- * I also spent only about 3 hours on this. I think it can be improved.
+ * I also spent only about 3 hours on this, all to re-write it
+ * because of some gate-level bug. I think it can be improved.
 */
 
 module tt_um_watbulb_sync_fifo #(
@@ -24,53 +25,44 @@ module tt_um_watbulb_sync_fifo #(
   input  wire       clk,      // clock
   input  wire       rst_n     // reset_n - low to reset
 );
+  // inputs
+  wire rd_en = ui_in[DATA_WIDTH + 1];
+  wire wr_en = ui_in[DATA_WIDTH];
+  wire [DATA_WIDTH - 1:0] dat_in = ui_in[DATA_WIDTH - 1:0];
 
-  reg wr_en,  rd_en;
-  reg o_full, o_empty;
-
-  reg [DEPTH - 2:0] count;
+  // locals
   reg [DEPTH - 2:0] wr_ptr;
   reg [DEPTH - 2:0] rd_ptr;
   reg [DATA_WIDTH - 1:0] fifo_reg [DEPTH - 1:0];
-  reg [DATA_WIDTH - 1:0] dat_out, dat_in;
 
-  assign dat_in  = ui_in[DATA_WIDTH - 1:0];
-  assign wr_en   = ui_in[DATA_WIDTH]; // yeah this is a hacky way, oh well
-  assign rd_en   = ui_in[DATA_WIDTH + 1];
-  assign uo_out  = rst_n ? {o_empty, o_full, dat_out} : '0;
-
-  // Are we full or empty?
-  always_comb begin
-    o_full  = rst_n ? (count == DEPTH) : 0;
-    o_empty = rst_n ? (count == '0)    : 1;
-  end
+  // output
+  reg [DATA_WIDTH - 1:0] dat_out;
+  reg o_full, o_empty;
 
   // Write/Read operation
   always @(posedge clk) begin
-    if (wr_en && !o_full) begin
+    if (!rst_n) begin
+      wr_ptr <= 0;
+    end else if (wr_en && !o_full) begin
+      wr_ptr <= (wr_ptr + 1);
       fifo_reg[wr_ptr][DATA_WIDTH - 1:0] <= dat_in;
+    end
+  end
+  always @(posedge clk) begin
+    if (!rst_n) begin
+      rd_ptr <= 0;
     end else if (rd_en && !o_empty) begin
-      dat_out[DATA_WIDTH - 1:0] <= fifo_reg[rd_ptr][DATA_WIDTH - 1:0];
+      rd_ptr  <= (rd_ptr + 1);
+      dat_out <= fifo_reg[rd_ptr][DATA_WIDTH - 1:0];
     end
   end
 
-  // Count management
-  always @(posedge clk) begin
-    if (!rst_n) begin
-      wr_ptr  <= '0;
-      rd_ptr  <= '0;
-      count   <= '0;
-    end else begin
-      if (o_full)  wr_ptr <= '0;
-      if (o_empty) rd_ptr <= '0;
-      if (wr_en && !o_full) begin
-        count  <= (count  + 1);
-        wr_ptr <= (wr_ptr + 1);
-      end else if (rd_en && !o_empty) begin
-        count  <= (count  - 1);
-        rd_ptr <= (rd_ptr + 1);
-      end
-    end
-  end
+  // Are we full or empty?
+  assign o_full  = rst_n ? ((wr_ptr + 1) == rd_ptr) : 0;
+  assign o_empty = rst_n ? ((wr_ptr == rd_ptr))     : 1;
+
+  // Assign output pins
+  assign uo_out  = rst_n ? {o_empty, o_full, dat_out} : '0;
+
 endmodule
 

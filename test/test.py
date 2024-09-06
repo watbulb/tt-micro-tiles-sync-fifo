@@ -50,6 +50,7 @@ async def test_full_push_pull(dut):
 
         if depth == MAX_DEPTH:
             assert dut.o_full.value == 0b1
+            pass
         assert dut.o_empty.value == 0b0
         print("FIFO is FULL!")
 
