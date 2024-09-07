@@ -26,8 +26,8 @@ module tt_um_watbulb_sync_fifo #(
   input  wire       rst_n     // reset_n - low to reset
 );
   // inputs
-  wire rd_en = ui_in[DATA_WIDTH + 1];
   wire wr_en = ui_in[DATA_WIDTH];
+  wire rd_en = ui_in[DATA_WIDTH + 1];
   wire [DATA_WIDTH - 1:0] dat_in = ui_in[DATA_WIDTH - 1:0];
 
   // locals
@@ -35,7 +35,6 @@ module tt_um_watbulb_sync_fifo #(
   reg [DEPTH - 2:0] wr_ptr;
   reg [DEPTH - 2:0] rd_ptr;
   reg [DATA_WIDTH - 1:0] fifo_reg [DEPTH - 1:0];
-
   // output
   reg [DATA_WIDTH - 1:0] dat_out;
   reg o_full, o_empty;
@@ -43,12 +42,12 @@ module tt_um_watbulb_sync_fifo #(
   int i;
   always @(posedge clk) begin
     if (!rst_n) begin
-      count       <= '0;
-      wr_ptr      <= '0;
-      rd_ptr      <= '0;
-      o_full      <=  0;
-      o_empty     <=  1;
-      dat_out     <= '0;
+      count    <= '0;
+      wr_ptr   <= '0;
+      rd_ptr   <= '0;
+      o_full   <=  0;
+      o_empty  <=  1;
+      dat_out  <= '0;
       for (i = 0; i < DEPTH; i = i + 1) begin : l_zero_fifo_reg
         fifo_reg[i] <= '0;
       end
@@ -60,15 +59,15 @@ module tt_um_watbulb_sync_fifo #(
       if (wr_en && !o_full) begin
         count   <= (count  + 1);
         wr_ptr  <= (wr_ptr + 1);
+        o_full  <= (count  + 1) == DEPTH;
         o_empty <= 0;
-        o_full  <= (count + 1) == DEPTH;
         fifo_reg[wr_ptr][DATA_WIDTH - 1:0] <= dat_in;
       end else if (rd_en && !o_empty) begin
         count   <= (count  - 1);
         rd_ptr  <= (rd_ptr + 1);
         o_empty <= (count  - 1) == '0;
         o_full  <= 0;
-        dat_out[DATA_WIDTH - 1:0] <= fifo_reg[rd_ptr][DATA_WIDTH - 1:0];
+        dat_out <= fifo_reg[rd_ptr][DATA_WIDTH - 1:0];
       end
     end
   end
